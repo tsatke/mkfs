@@ -13,5 +13,5 @@ members = [
 
 [dependencies]
 clap = { version = "4.3.2", features = ["derive"] }
-ext2 = { path = "ext2" }
-filesystem = { path = "filesystem" }
+mkfs-ext2 = { path = "ext2" }
+mkfs-filesystem = { path = "filesystem" }

@@ -139,18 +139,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ext2"
-version = "0.1.0"
-dependencies = [
- "bitflags 2.3.1",
- "filesystem",
-]
-
-[[package]]
-name = "filesystem"
-version = "0.1.0"
-
-[[package]]
 name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -202,9 +190,21 @@ name = "mkfs"
 version = "0.1.0"
 dependencies = [
  "clap",
- "ext2",
- "filesystem",
+ "mkfs-ext2",
+ "mkfs-filesystem",
 ]
+
+[[package]]
+name = "mkfs-ext2"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.3.1",
+ "mkfs-filesystem",
+]
+
+[[package]]
+name = "mkfs-filesystem"
+version = "0.1.0"
 
 [[package]]
 name = "once_cell"
