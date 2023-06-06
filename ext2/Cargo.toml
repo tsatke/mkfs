@@ -2,6 +2,8 @@
 name = "mkfs-ext2"
 version = "0.1.0"
 edition = "2021"
+description = "Read or write ext2 file systems (in no_std environments)."
+license = "MIT OR Apache-2.0"
 
 [lib]
 name = "ext2"
