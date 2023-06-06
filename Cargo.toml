@@ -1,0 +1,17 @@
+[package]
+name = "mkfs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace]
+members = [
+    "filesystem",
+    "ext2",
+]
+
+[dependencies]
+clap = { version = "4.3.2", features = ["derive"] }
+ext2 = { path = "ext2" }
+filesystem = { path = "filesystem" }
