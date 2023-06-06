@@ -2,6 +2,8 @@
 name = "mkfs-filesystem"
 version = "0.1.0"
 edition = "2021"
+description = "The base library for the mkfs-* crates."
+license = "MIT OR Apache-2.0"
 
 [lib]
 name = "filesystem"
