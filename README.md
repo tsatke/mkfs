@@ -1,6 +1,13 @@
 # mkfs
 `mkfs` written in pure Rust.
 
+## Motivation
+I needed a library that could work with file systems in `no_std` environments for my kernel.
+Additionally, for testing, I needed a library that I could use easily to create and edit
+new file system images, and that I could use in my `build.rs` file. Those things can be done
+by `mkfs`. However, `mkfs` is not available out of the box on all platforms, so I opted for
+something that can be integrated in the `cargo` build process.
+
 ## Supported file systems
 - [ ] ext2 (in progress)
 - [ ] ext3
