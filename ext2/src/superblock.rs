@@ -1,208 +1,234 @@
-use alloc::string::{FromUtf8Error, String};
-use core::fmt::{Debug, Display, Formatter};
+use core::ops::{Deref, DerefMut, Shl};
 
+use crate::{bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented};
 use bitflags::bitflags;
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct Superblock {
-    pub num_inodes: u32,
-    pub num_blocks: u32,
-    pub num_superuser_reserved_blocks: u32,
-    pub num_unallocated_blocks: u32,
-    pub num_unallocated_inodes: u32,
-    pub superblock_block_number: u32,
-    pub block_size: u32,
-    pub fragment_size: u32,
-    pub blocks_per_group: u32,
-    pub fragments_per_group: u32,
-    pub inodes_per_group: u32,
-    pub last_mount_time: u32,
-    pub last_written_time: u32,
-    pub mounts_since_fsck: u16,
-    pub mounts_allowed_before_fsck: u16,
-    pub magic_number: u16,
-    pub state: State,
-    pub error_policy: ErrorPolicy,
-    pub version_minor: u16,
-    pub last_fsck: u32,
-    pub fsck_force_interval: u32,
-    pub os_id: u32,
-    pub version_major: u32,
-    pub uid_for_reserved_blocks: u16,
-    pub gid_for_reserved_blocks: u16,
-    pub extended: Option<SuperblockExtended>,
-}
+pub struct SuperblockArray([u8; 1024]);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum SuperblockDecodeError {
-    InvalidMagicNumber,
-    /// Indicates, that more bytes were expected than provided.
-    /// This is an internal error.
-    ShortRead,
-    InvalidBlockSize,
-    InvalidFragmentSize,
-    InvalidData,
-}
-
-impl Display for SuperblockDecodeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        Debug::fmt(&self, f)
+impl From<[u8; 1024]> for SuperblockArray {
+    fn from(value: [u8; 1024]) -> Self {
+        Self(value)
     }
 }
 
-impl core::error::Error for SuperblockDecodeError {}
-
-impl From<ShortReadError> for SuperblockDecodeError {
-    fn from(_: ShortReadError) -> Self {
-        Self::ShortRead
+impl Default for SuperblockArray {
+    fn default() -> Self {
+        SuperblockArray([0_u8; 1024])
     }
 }
 
-impl From<FromUtf8Error> for SuperblockDecodeError {
-    fn from(_: FromUtf8Error) -> Self {
-        Self::InvalidData
+impl Deref for SuperblockArray {
+    type Target = [u8; 1024];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-impl TryFrom<[u8; 1024]> for Superblock {
-    type Error = SuperblockDecodeError;
-
-    fn try_from(value: [u8; 1024]) -> Result<Self, Self::Error> {
-        let num_inodes = read_u32_le(&value[0..4])?;
-        let num_blocks = read_u32_le(&value[4..8])?;
-        let num_superuser_reserved_blocks = read_u32_le(&value[8..12])?;
-        let num_unallocated_blocks = read_u32_le(&value[12..16])?;
-        let num_unallocated_inodes = read_u32_le(&value[16..20])?;
-        let superblock_block_number = read_u32_le(&value[20..24])?;
-        let log2_block_size = read_u32_le(&value[24..28])?;
-        let block_size = u32::checked_shl(1024, log2_block_size)
-            .ok_or(SuperblockDecodeError::InvalidBlockSize)?;
-        let log2_fragment_size = read_u32_le(&value[28..32])?;
-        let fragment_size = u32::checked_shl(1024, log2_fragment_size)
-            .ok_or(SuperblockDecodeError::InvalidFragmentSize)?;
-        let blocks_per_group = read_u32_le(&value[32..36])?;
-        let fragments_per_group = read_u32_le(&value[36..40])?;
-        let inodes_per_group = read_u32_le(&value[40..44])?;
-        let last_mount_time = read_u32_le(&value[44..48])?;
-        let last_written_time = read_u32_le(&value[48..52])?;
-        let mounts_since_fsck = read_u16_le(&value[52..54])?;
-        let mounts_allowed_before_fsck = read_u16_le(&value[54..56])?;
-        let magic_number = read_u16_le(&value[56..58])?;
-        let state = State::from_bits_truncate(read_u16_le(&value[58..60])?);
-        let error_policy = ErrorPolicy::from_bits_truncate(read_u16_le(&value[60..62])?);
-        let version_minor = read_u16_le(&value[62..64])?;
-        let last_fsck = read_u32_le(&value[64..68])?;
-        let fsck_force_interval = read_u32_le(&value[68..72])?;
-        let os_id = read_u32_le(&value[72..76])?;
-        let version_major = read_u32_le(&value[76..80])?;
-        let uid_for_reserved_blocks = read_u16_le(&value[80..82])?;
-        let gid_for_reserved_blocks = read_u16_le(&value[82..84])?;
-
-        // validation
-
-        if blocks_per_group < 1 || inodes_per_group < 1 {
-            return Err(SuperblockDecodeError::InvalidData);
-        }
-        let check1 = (num_blocks + blocks_per_group - 1) / blocks_per_group;
-        let check2 = (num_inodes + inodes_per_group - 1) / inodes_per_group;
-        if check1 != check2 {
-            return Err(SuperblockDecodeError::InvalidData);
-        }
-
-        if magic_number != 0xEF53 {
-            return Err(SuperblockDecodeError::InvalidMagicNumber);
-        }
-
-        let extended = if version_major >= 1 {
-            Some(SuperblockExtended::try_from(value)?)
-        } else {
-            None
-        };
-
-        Ok(Self {
-            num_inodes,
-            num_blocks,
-            num_superuser_reserved_blocks,
-            num_unallocated_blocks,
-            num_unallocated_inodes,
-            superblock_block_number,
-            block_size,
-            fragment_size,
-            blocks_per_group,
-            fragments_per_group,
-            inodes_per_group,
-            last_mount_time,
-            last_written_time,
-            mounts_since_fsck,
-            mounts_allowed_before_fsck,
-            magic_number,
-            state,
-            error_policy,
-            version_minor,
-            last_fsck,
-            fsck_force_interval,
-            os_id,
-            version_major,
-            uid_for_reserved_blocks,
-            gid_for_reserved_blocks,
-            extended,
-        })
+impl DerefMut for SuperblockArray {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+bytefield! {
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct Superblock (SuperblockArray) {
+        num_inodes: u32 = 0,
+        num_blocks: u32 = 4,
+        num_superuser_reserved_blocks: u32 = 8,
+        num_unallocated_blocks: u32 = 12,
+        num_unallocated_inodes: u32 = 16,
+        superblock_block_number: u32 = 20,
+        log2_block_size: u32 = 24,
+        log2_fragment_size: u32 = 28,
+        blocks_per_group: u32 = 32,
+        fragments_per_group: u32 = 36,
+        inodes_per_group: u32 = 40,
+        last_mount_time: u32 = 44,
+        last_written_time: u32 = 48,
+        mounts_since_fsck: u16 = 52,
+        mounts_allowed_before_fsck: u16 = 54,
+        magic_number: u16 = 56,
+        state: u16 = 58,
+        error_policy: u16 = 60,
+        version_minor: u16 = 62,
+        last_fsck: u32 = 64,
+        fsck_force_interval: u32 = 68,
+        os_id: u32 = 72,
+        version_major: u32 = 76,
+        uid_for_reserved_blocks: u16 = 80,
+        gid_for_reserved_blocks: u16 = 82,
+
+        // extended
+
+        first_non_reserved_inode: u32 = 84,
+        inode_size: u16 = 88,
+        this_superblock_block_group: u16 = 90,
+        optional_features: u32 = 92,
+        required_features: u32 = 96,
+        write_required_features: u32 = 100,
+        fsid: [u8; 16] = 104,
+        volume_name: [u8; 16] = 120,
+        last_mount_path: [u8; 16] = 136,
+        compression: u32 = 200,
+        num_preallocate_blocks_file: u8 = 204,
+        num_preallocate_blocks_directory: u8 = 205,
+    }
+}
+
+impl Superblock {
+    pub fn num_inodes(&self) -> u32 {
+        self.num_inodes
+    }
+
+    pub fn num_blocks(&self) -> u32 {
+        self.num_blocks
+    }
+
+    pub fn num_superuser_reserved_blocks(&self) -> u32 {
+        self.num_superuser_reserved_blocks
+    }
+
+    pub fn num_unallocated_blocks(&self) -> u32 {
+        self.num_unallocated_blocks
+    }
+
+    pub fn num_unallocated_inodes(&self) -> u32 {
+        self.num_unallocated_inodes
+    }
+
+    pub fn superblock_block_number(&self) -> u32 {
+        self.superblock_block_number
+    }
+
+    pub fn block_size(&self) -> u32 {
+        u32::shl(1024, self.log2_block_size)
+    }
+
+    pub fn fragment_size(&self) -> u32 {
+        u32::shl(1024, self.log2_fragment_size)
+    }
+
+    pub fn blocks_per_group(&self) -> u32 {
+        self.blocks_per_group
+    }
+
+    pub fn fragments_per_group(&self) -> u32 {
+        self.fragments_per_group
+    }
+
+    pub fn inodes_per_group(&self) -> u32 {
+        self.inodes_per_group
+    }
+
+    pub fn last_mount_time(&self) -> u32 {
+        self.last_mount_time
+    }
+
+    pub fn last_written_time(&self) -> u32 {
+        self.last_written_time
+    }
+
+    pub fn mounts_since_fsck(&self) -> u16 {
+        self.mounts_since_fsck
+    }
+
+    pub fn mounts_allowed_before_fsck(&self) -> u16 {
+        self.mounts_allowed_before_fsck
+    }
+
+    pub fn magic_number(&self) -> u16 {
+        self.magic_number
+    }
+
+    pub fn state(&self) -> State {
+        State::from_bits_truncate(self.state)
+    }
+
+    pub fn error_policy(&self) -> ErrorPolicy {
+        ErrorPolicy::from_bits_truncate(self.error_policy)
+    }
+
+    pub fn version_minor(&self) -> u16 {
+        self.version_minor
+    }
+
+    pub fn last_fsck(&self) -> u32 {
+        self.last_fsck
+    }
+
+    pub fn fsck_force_interval(&self) -> u32 {
+        self.fsck_force_interval
+    }
+
+    pub fn os_id(&self) -> u32 {
+        self.os_id
+    }
+
+    pub fn version_major(&self) -> u32 {
+        self.version_major
+    }
+
+    pub fn uid_for_reserved_blocks(&self) -> u16 {
+        self.uid_for_reserved_blocks
+    }
+
+    pub fn gid_for_reserved_blocks(&self) -> u16 {
+        self.gid_for_reserved_blocks
+    }
+
+    pub fn first_non_reserved_inode(&self) -> u32 {
+        self.first_non_reserved_inode
+    }
+
+    pub fn inode_size(&self) -> u16 {
+        self.inode_size
+    }
+
+    pub fn this_superblock_block_group(&self) -> u16 {
+        self.this_superblock_block_group
+    }
+
+    pub fn optional_features(&self) -> OptionalFeatures {
+        OptionalFeatures::from_bits_truncate(self.optional_features)
+    }
+
+    pub fn required_features(&self) -> RequiredFeatures {
+        RequiredFeatures::from_bits_truncate(self.required_features)
+    }
+
+    pub fn write_required_features(&self) -> ReadOnlyFeatures {
+        ReadOnlyFeatures::from_bits_truncate(self.write_required_features)
+    }
+
+    pub fn fsid(&self) -> Ext2FsId {
+        Ext2FsId(self.fsid)
+    }
+
+    pub fn volume_name(&self) -> &str {
+        core::str::from_utf8(&self.volume_name).unwrap()
+    }
+
+    pub fn last_mount_path(&self) -> &str {
+        core::str::from_utf8(&self.last_mount_path).unwrap()
+    }
+
+    pub fn compression(&self) -> u32 {
+        self.compression
+    }
+
+    pub fn num_preallocate_blocks_file(&self) -> u8 {
+        self.num_preallocate_blocks_file
+    }
+
+    pub fn num_preallocate_blocks_directory(&self) -> u8 {
+        self.num_preallocate_blocks_directory
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Ext2FsId([u8; 16]);
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct SuperblockExtended {
-    pub first_non_reserved_inode: u32,
-    pub inode_size: u16,
-    pub this_superblock_block_group: u16,
-    pub optional_features: OptionalFeatures,
-    pub required_features: RequiredFeatures,
-    pub write_required_features: ReadOnlyFeatures,
-    pub fsid: Ext2FsId,
-    pub volume_name: String,
-    pub last_mount_path: String,
-    pub compression: u32,
-    pub num_preallocate_blocks_file: u8,
-    pub num_preallocate_blocks_directory: u8,
-}
-
-impl TryFrom<[u8; 1024]> for SuperblockExtended {
-    type Error = SuperblockDecodeError;
-
-    fn try_from(value: [u8; 1024]) -> Result<Self, Self::Error> {
-        let first_non_reserved_inode = read_u32_le(&value[84..88])?;
-        let inode_size = read_u16_le(&value[88..90])?;
-        let this_superblock_block_group = read_u16_le(&value[90..92])?;
-        let optional_features = read_u32_le(&value[92..96])?;
-        let required_features = read_u32_le(&value[96..100])?;
-        let write_required_features = read_u32_le(&value[100..104])?;
-        let mut fsid = [0_u8; 16];
-        fsid.copy_from_slice(&value[104..120]);
-        let volume_name = read_c_str(&value[120..136])?;
-        let last_mount_path = read_c_str(&value[136..200])?;
-        let compression = read_u32_le(&value[200..204])?;
-        let num_preallocate_blocks_file = value[204];
-        let num_preallocate_blocks_directory = value[205];
-
-        Ok(Self {
-            first_non_reserved_inode,
-            inode_size,
-            this_superblock_block_group,
-            optional_features: OptionalFeatures::from_bits_truncate(optional_features),
-            required_features: RequiredFeatures::from_bits_truncate(required_features),
-            write_required_features: ReadOnlyFeatures::from_bits_truncate(write_required_features),
-            fsid: Ext2FsId(fsid),
-            volume_name,
-            last_mount_path,
-            compression,
-            num_preallocate_blocks_file,
-            num_preallocate_blocks_directory,
-        })
-    }
-}
 
 bitflags! {
     #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -252,32 +278,9 @@ bitflags! {
     }
 }
 
-#[derive(Debug)]
-struct ShortReadError;
-
-fn read_u32_le(data: &[u8]) -> Result<u32, ShortReadError> {
-    if data.len() < 4 {
-        return Err(ShortReadError);
-    }
-    Ok(u32::from_le_bytes(data[0..4].try_into().unwrap()))
-}
-
-fn read_u16_le(data: &[u8]) -> Result<u16, ShortReadError> {
-    if data.len() < 2 {
-        return Err(ShortReadError);
-    }
-    Ok(u16::from_le_bytes(data[0..2].try_into().unwrap()))
-}
-
-fn read_c_str(data: &[u8]) -> Result<String, FromUtf8Error> {
-    let termination_index = data.iter().position(|&b| b == 0).unwrap_or(data.len() + 1);
-    String::from_utf8(data[0..termination_index].into())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::string::ToString;
 
     #[test]
     fn test_superblock_try_from() {
@@ -358,7 +361,7 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
         ];
-        let sb = Superblock::try_from(data).unwrap();
+        let sb = Superblock::try_from(SuperblockArray::from(data)).unwrap();
 
         // result manually validated via `debugfs`
         assert_eq!(
@@ -369,8 +372,8 @@ mod tests {
                 num_unallocated_blocks: 970,
                 num_unallocated_inodes: 117,
                 superblock_block_number: 1,
-                block_size: 1024,
-                fragment_size: 1024,
+                log2_block_size: 0,
+                log2_fragment_size: 0,
                 blocks_per_group: 8192,
                 fragments_per_group: 8192,
                 inodes_per_group: 128,
@@ -379,8 +382,8 @@ mod tests {
                 mounts_since_fsck: 0,
                 mounts_allowed_before_fsck: 65535,
                 magic_number: 61267,
-                state: State::CLEAN,
-                error_policy: ErrorPolicy::IGNORE,
+                state: 1,
+                error_policy: 1,
                 version_minor: 0,
                 last_fsck: 1686068677,
                 fsck_force_interval: 0,
@@ -388,72 +391,23 @@ mod tests {
                 version_major: 1,
                 uid_for_reserved_blocks: 0,
                 gid_for_reserved_blocks: 0,
-                extended: Some(SuperblockExtended {
-                    first_non_reserved_inode: 11,
-                    inode_size: 256,
-                    this_superblock_block_group: 0,
-                    optional_features: OptionalFeatures::INODES_EXTENDED_ATTRIBUTES
-                        | OptionalFeatures::CAN_RESIZE
-                        | OptionalFeatures::DIRECTORIES_USE_HASH_INDEX,
-                    required_features: RequiredFeatures::DIRECTORY_ENTRIES_HAVE_TYPE,
-                    write_required_features: ReadOnlyFeatures::SPARSE_SUPERBLOCK_AND_GDTS
-                        | ReadOnlyFeatures::USE_64BIT_FILE_SIZE,
-                    fsid: Ext2FsId([
-                        119, 75, 148, 206, 61, 5, 75, 113, 152, 252, 252, 246, 55, 253, 43, 72,
-                    ],),
-                    volume_name: "".to_string(),
-                    last_mount_path: "".to_string(),
-                    compression: 0,
-                    num_preallocate_blocks_file: 0,
-                    num_preallocate_blocks_directory: 0,
-                },),
+                first_non_reserved_inode: 11,
+                inode_size: 256,
+                this_superblock_block_group: 0,
+                optional_features: 0x38,
+                required_features: 2,
+                write_required_features: 3,
+                fsid: [119, 75, 148, 206, 61, 5, 75, 113, 152, 252, 252, 246, 55, 253, 43, 72],
+                volume_name: [0_u8; 16],
+                last_mount_path: [0_u8; 16],
+                compression: 0,
+                num_preallocate_blocks_file: 0,
+                num_preallocate_blocks_directory: 0,
             },
             sb
         );
-    }
 
-    #[test]
-    fn test_read_u32_le() {
-        for (expected, data) in [
-            (1, [0x01, 0x00, 0x00, 0x00]),
-            (2, [0x02, 0x00, 0x00, 0x00]),
-            (255, [0xFF, 0x00, 0x00, 0x00]),
-            (65280, [0x00, 0xFF, 0x00, 0x00]),
-            (4294967040, [0x00, 0xFF, 0xFF, 0xFF]),
-            (4294967295, [0xFF, 0xFF, 0xFF, 0xFF]),
-        ] {
-            let actual = read_u32_le(&data).unwrap();
-            assert_eq!(expected, actual);
-        }
-    }
-
-    #[test]
-    fn test_read_u32_le_short() {
-        assert!(read_u32_le(&[]).is_err());
-        assert!(read_u32_le(&[0]).is_err());
-        assert!(read_u32_le(&[0, 0]).is_err());
-        assert!(read_u32_le(&[0, 0, 0]).is_err());
-        assert!(read_u32_le(&[0, 0, 0, 0]).is_ok_and(|i| i == 0));
-    }
-
-    #[test]
-    fn test_read_u16_le() {
-        for (expected, data) in [
-            (1, [0x01, 0x00]),
-            (2, [0x02, 0x00]),
-            (255, [0xFF, 0x00]),
-            (65280, [0x00, 0xFF]),
-            (65535, [0xFF, 0xFF]),
-        ] {
-            let actual = read_u16_le(&data).unwrap();
-            assert_eq!(expected, actual);
-        }
-    }
-
-    #[test]
-    fn test_read_u16_le_short() {
-        assert!(read_u16_le(&[]).is_err());
-        assert!(read_u16_le(&[0]).is_err());
-        assert!(read_u16_le(&[0, 0]).is_ok_and(|i| i == 0));
+        let reversed = Into::<SuperblockArray>::into(sb);
+        assert_eq!(data[..206], reversed[..206]); // only check the actual superblock data
     }
 }
