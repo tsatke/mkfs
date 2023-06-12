@@ -4,12 +4,10 @@ use crate::{
     bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented, Ext2Fs, Inode,
     Type,
 };
-use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
-use bitflags::{bitflags, Flags};
+use bitflags::bitflags;
 use core::fmt::{Debug, Formatter};
-use core::iter::FusedIterator;
 use filesystem::BlockDevice;
 
 impl<T> Ext2Fs<T>
@@ -33,16 +31,14 @@ where
             .filter(|&p| p != 0)
         {
             let mut data = vec![0_u8; block_size];
-            let addr = self.get_block_address(block);
-            self.block_device
-                .read_at(addr, &mut data)
+            self.read_block(block, &mut data)
                 .map_err(|_| Error::DeviceRead)?;
 
             let mut offset = 0;
             while offset < block_size - 8 {
                 let dir_entry = DirEntry::from(dir_entries_have_type, &data[offset..]);
-                offset += 8 + dir_entry.name_length as usize;
-                offset = (offset + 3) & !0x03; // align to 4
+                offset += dir_entry.total_size as usize;
+                // we don't need to align the offset, as there must be no space between entries
                 if dir_entry.inode == 0 {
                     // entry invalid, move on
                     continue;
@@ -61,26 +57,6 @@ pub struct DirEntry {
     name_length: u16,
     type_indicator: Option<DirType>,
     name_bytes: Vec<u8>,
-}
-
-impl Debug for DirEntry {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        let mut debug_struct = f.debug_struct("DirEntry");
-        debug_struct
-            .field("inode", &self.inode)
-            .field("total_size", &self.total_size)
-            .field("name_length", &self.name_length);
-        if let Some(type_indicator) = &self.type_indicator {
-            debug_struct.field("type_indicator", &type_indicator);
-        }
-        debug_struct.field(
-            "name",
-            &core::str::from_utf8(&self.name_bytes[..self.name_length as usize]),
-        );
-        debug_struct.field("name_bytes", &&self.name_bytes[..self.name_length as usize]);
-
-        debug_struct.finish()
-    }
 }
 
 impl DirEntry {
@@ -112,6 +88,41 @@ impl DirEntry {
             type_indicator,
             name_bytes,
         }
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        match core::str::from_utf8(&self.name_bytes) {
+            Ok(s) => Some(s),
+            Err(_) => None,
+        }
+    }
+
+    pub fn typ(&self) -> Option<DirType> {
+        self.type_indicator
+    }
+
+    pub fn inode(&self) -> u32 {
+        self.inode
+    }
+}
+
+impl Debug for DirEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let mut debug_struct = f.debug_struct("DirEntry");
+        debug_struct
+            .field("inode", &self.inode)
+            .field("total_size", &self.total_size)
+            .field("name_length", &self.name_length);
+        if let Some(type_indicator) = &self.type_indicator {
+            debug_struct.field("type_indicator", &type_indicator);
+        }
+        debug_struct.field(
+            "name",
+            &core::str::from_utf8(&self.name_bytes[..self.name_length as usize]),
+        );
+        debug_struct.field("name_bytes", &&self.name_bytes[..self.name_length as usize]);
+
+        debug_struct.finish()
     }
 }
 

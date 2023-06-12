@@ -42,8 +42,8 @@ fn main() {
     }
 }
 
-fn handle_ext2(ext2: Ext2) {}
+fn handle_ext2(_ext2: Ext2) {}
 
-fn handle_ext3(ext3: Ext3) {}
+fn handle_ext3(_ext3: Ext3) {}
 
-fn handle_ext4(ext4: Ext4) {}
+fn handle_ext4(_ext4: Ext4) {}

@@ -10,7 +10,6 @@ use core::num::NonZeroU32;
 use core::ops::Deref;
 
 use crate::block_group::{BlockGroupDescriptor, BlockGroupDescriptorTable};
-use crate::superblock::{Superblock, SuperblockArray};
 
 mod block_group;
 mod bytefield;
@@ -24,13 +23,14 @@ use filesystem::BlockDevice;
 pub use dir::*;
 pub use error::*;
 pub use inode::*;
+pub use superblock::*;
 
-const ROOT_DIR_INODE_ADDRESS: Ext2InodeAddress = Ext2InodeAddress::new(2).unwrap();
+const ROOT_DIR_INODE_ADDRESS: InodeAddress = InodeAddress::new(2).unwrap();
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-struct Ext2InodeAddress(NonZeroU32);
+struct InodeAddress(NonZeroU32);
 
-impl Deref for Ext2InodeAddress {
+impl Deref for InodeAddress {
     type Target = NonZeroU32;
 
     fn deref(&self) -> &Self::Target {
@@ -38,7 +38,7 @@ impl Deref for Ext2InodeAddress {
     }
 }
 
-impl Ext2InodeAddress {
+impl InodeAddress {
     pub const fn new(n: u32) -> Option<Self> {
         let nzu32 = NonZeroU32::new(n);
         match nzu32 {
@@ -93,7 +93,7 @@ where
         self.read_inode(ROOT_DIR_INODE_ADDRESS)
     }
 
-    fn read_inode(&self, addr: Ext2InodeAddress) -> Result<Inode, ()> {
+    fn read_inode(&self, addr: InodeAddress) -> Result<Inode, ()> {
         let inodes_per_group = self.superblock.inodes_per_group();
         let block_group_index = (addr.get() - 1) / inodes_per_group;
         let block_group = &self.bgdt[block_group_index as usize];

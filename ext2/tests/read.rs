@@ -1,4 +1,4 @@
-use ext2::{Ext2Fs, Inode};
+use ext2::{DirType, Ext2Fs};
 use filesystem::MemoryBlockDevice;
 use std::env;
 use std::fs::File;
@@ -19,6 +19,23 @@ fn test_read() {
     let fs = Ext2Fs::try_new(device).unwrap();
     let root = fs.read_root_inode().unwrap();
     let entries = fs.list_dir(&root).unwrap();
-    // entries.iter().for_each(|entry| println!("{:?}", entry));
-    assert_eq!(5, entries.len());
+
+    let expected_entries = [
+        (2, ".", DirType::Directory),
+        (2, "..", DirType::Directory),
+        (11, "lost+found", DirType::Directory),
+        (12, "hello.txt", DirType::RegularFile),
+        (13, "some", DirType::Directory),
+    ];
+    assert_eq!(expected_entries.len(), entries.len());
+    for (inode, name, typ) in expected_entries {
+        assert!(entries
+            .iter()
+            .find(|&entry| {
+                entry.inode() == inode
+                    && entry.name().is_some_and(|n| n == name)
+                    && entry.typ() == Some(typ)
+            })
+            .is_some());
+    }
 }
