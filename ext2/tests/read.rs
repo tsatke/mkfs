@@ -12,6 +12,7 @@ fn test_read() {
     let mut data = Vec::new();
 
     let mut file = File::open(&image).unwrap();
+    assert_eq!(1048576_u64, file.metadata().unwrap().len());
     file.read_to_end(&mut data).unwrap();
 
     let device = MemoryBlockDevice::try_new(512, data).unwrap();
