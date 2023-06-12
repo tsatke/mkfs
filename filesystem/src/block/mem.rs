@@ -1,7 +1,7 @@
 use crate::BlockDevice;
 
 pub struct MemoryBlockDevice<T> {
-    block_size: usize,
+    sector_size: usize,
     data: T,
 }
 
@@ -9,12 +9,12 @@ impl<T> MemoryBlockDevice<T>
 where
     T: AsRef<[u8]> + AsMut<[u8]>,
 {
-    pub fn try_new(block_size: usize, data: T) -> Option<Self> {
+    pub fn try_new(sector_size: usize, data: T) -> Option<Self> {
         let mut data = data;
-        if data.as_mut().len() % block_size != 0 {
+        if data.as_mut().len() % sector_size != 0 {
             return None;
         }
-        Some(Self { block_size, data })
+        Some(Self { sector_size, data })
     }
 }
 
@@ -25,25 +25,25 @@ where
     type Error = ();
 
     fn sector_size(&self) -> usize {
-        self.block_size
+        self.sector_size
     }
 
     fn sector_count(&self) -> usize {
         self.data.as_ref().len()
     }
 
-    fn read_sector(&self, block_index: usize, buf: &mut [u8]) -> Result<usize, Self::Error> {
+    fn read_sector(&self, sector_index: usize, buf: &mut [u8]) -> Result<usize, Self::Error> {
         debug_assert_eq!(self.sector_size(), buf.len());
-        let start_offset = block_index * self.sector_size();
+        let start_offset = sector_index * self.sector_size();
         let end_offset = start_offset + self.sector_size();
         let data = self.data.as_ref();
         buf.copy_from_slice(&data[start_offset..end_offset]);
         Ok(buf.len())
     }
 
-    fn write_sector(&mut self, block_index: usize, buf: &[u8]) -> Result<usize, Self::Error> {
+    fn write_sector(&mut self, sector_index: usize, buf: &[u8]) -> Result<usize, Self::Error> {
         debug_assert_eq!(self.sector_size(), buf.len());
-        let start_offset = block_index * self.sector_size();
+        let start_offset = sector_index * self.sector_size();
         let end_offset = start_offset + self.sector_size();
         let data = self.data.as_mut();
         data[start_offset..end_offset].copy_from_slice(buf);
