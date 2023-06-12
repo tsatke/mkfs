@@ -20,7 +20,7 @@ where
         }
 
         let mut entries = Vec::new();
-        let block_size = self.block_device.block_size();
+        let block_size = self.superblock.block_size() as usize;
         let dir_entries_have_type = self
             .superblock
             .required_features()

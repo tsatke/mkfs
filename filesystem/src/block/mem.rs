@@ -24,27 +24,27 @@ where
 {
     type Error = ();
 
-    fn block_size(&self) -> usize {
+    fn sector_size(&self) -> usize {
         self.block_size
     }
 
-    fn block_count(&self) -> usize {
+    fn sector_count(&self) -> usize {
         self.data.as_ref().len()
     }
 
-    fn read_block(&self, block_index: usize, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        debug_assert_eq!(self.block_size(), buf.len());
-        let start_offset = block_index * self.block_size();
-        let end_offset = start_offset + self.block_size();
+    fn read_sector(&self, block_index: usize, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        debug_assert_eq!(self.sector_size(), buf.len());
+        let start_offset = block_index * self.sector_size();
+        let end_offset = start_offset + self.sector_size();
         let data = self.data.as_ref();
         buf.copy_from_slice(&data[start_offset..end_offset]);
         Ok(buf.len())
     }
 
-    fn write_block(&mut self, block_index: usize, buf: &[u8]) -> Result<usize, Self::Error> {
-        debug_assert_eq!(self.block_size(), buf.len());
-        let start_offset = block_index * self.block_size();
-        let end_offset = start_offset + self.block_size();
+    fn write_sector(&mut self, block_index: usize, buf: &[u8]) -> Result<usize, Self::Error> {
+        debug_assert_eq!(self.sector_size(), buf.len());
+        let start_offset = block_index * self.sector_size();
+        let end_offset = start_offset + self.sector_size();
         let data = self.data.as_mut();
         data[start_offset..end_offset].copy_from_slice(buf);
         Ok(buf.len())

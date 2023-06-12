@@ -4,7 +4,6 @@ macro_rules! check_is_implemented {
         const _: () = {
             const fn check<T: $t>() {}
             check::<$implementor>();
-            ()
         };
     };
 }

@@ -89,11 +89,11 @@ where
         })
     }
 
-    pub fn read_root_inode(&self) -> Result<Inode, ()> {
+    pub fn read_root_inode(&self) -> Result<Inode, Error> {
         self.read_inode(ROOT_DIR_INODE_ADDRESS)
     }
 
-    fn read_inode(&self, addr: InodeAddress) -> Result<Inode, ()> {
+    fn read_inode(&self, addr: InodeAddress) -> Result<Inode, Error> {
         let inodes_per_group = self.superblock.inodes_per_group();
         let block_group_index = (addr.get() - 1) / inodes_per_group;
         let block_group = &self.bgdt[block_group_index as usize];
@@ -107,11 +107,12 @@ where
         let mut inode_buffer = [0_u8; 128]; // inode size can vary, but the specified fields are always between 0 and 128, and we don't need more
         self.block_device
             .read_at(address, &mut inode_buffer)
-            .map_err(|_| ())?;
+            .map_err(|_| Error::DeviceRead)?;
 
-        Ok(Inode::try_from(InodeRawArray::from(inode_buffer))
-            .map_err(|_| ())?
-            .into())
+        Ok(
+            Inode::try_from(InodeRawArray::from(inode_buffer))
+                .expect("inode conversion can't fail. if it does, the logic has changed and this should propagate the error")
+        )
     }
 
     pub(crate) fn read_block(&self, block: u32, buf: &mut [u8]) -> Result<usize, T::Error> {
