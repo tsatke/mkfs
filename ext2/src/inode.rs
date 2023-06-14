@@ -1,6 +1,49 @@
-use crate::{bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented};
+use crate::{
+    bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented, BlockAddress,
+};
 use bitflags::bitflags;
 use core::ops::{Deref, DerefMut};
+
+macro_rules! inode_type {
+    ($name:ident, $typ:expr) => {
+        #[derive(Debug)]
+        pub struct $name(Inode);
+
+        impl Deref for $name {
+            type Target = Inode;
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl TryFrom<Inode> for $name {
+            type Error = Inode;
+
+            fn try_from(v: Inode) -> Result<Self, Self::Error> {
+                if v.typ() == $typ {
+                    Ok(Self(v))
+                } else {
+                    Err(v)
+                }
+            }
+        }
+
+        impl From<$name> for Inode {
+            fn from(v: $name) -> Self {
+                v.0
+            }
+        }
+    };
+}
+
+inode_type!(Fifo, Type::FIFO);
+inode_type!(CharacterDeviceFile, Type::CharacterDevice);
+inode_type!(Directory, Type::Directory);
+inode_type!(BlockDeviceFile, Type::BlockDevice);
+inode_type!(RegularFile, Type::RegularFile);
+inode_type!(SymLink, Type::SymLink);
+inode_type!(UnixSocket, Type::UnixSocket);
 
 pub struct InodeRawArray([u8; 128]);
 
@@ -81,8 +124,8 @@ impl Inode {
         Flags::from_bits_truncate(self.flags)
     }
 
-    pub fn direct_ptr(&self, index: usize) -> u32 {
-        match index {
+    pub fn direct_ptr(&self, index: usize) -> Option<BlockAddress> {
+        BlockAddress::new(match index {
             0 => self.direct_block_ptr_0,
             1 => self.direct_block_ptr_1,
             2 => self.direct_block_ptr_2,
@@ -96,7 +139,19 @@ impl Inode {
             10 => self.direct_block_ptr_10,
             11 => self.direct_block_ptr_11,
             _ => panic!("direct pointer {} does not exist", index),
+        })
+    }
+
+    pub fn len(&self) -> usize {
+        if self.typ() == Type::Directory {
+            self.byte_size_lower as usize
+        } else {
+            self.byte_size_lower as usize | ((self.byte_size_upper_or_dir_acl as usize) << 32)
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 

@@ -1,8 +1,8 @@
 use crate::error::Error;
 use crate::superblock::RequiredFeatures;
 use crate::{
-    bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented, Ext2Fs, Inode,
-    Type,
+    bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented, Directory,
+    Ext2Fs, Inode, InodeAddress,
 };
 use alloc::vec;
 use alloc::vec::Vec;
@@ -14,11 +14,8 @@ impl<T> Ext2Fs<T>
 where
     T: BlockDevice,
 {
-    pub fn list_dir(&self, inode: &Inode) -> Result<Vec<DirEntry>, Error> {
-        if !inode.typ().contains(Type::Directory) {
-            return Err(Error::NotDirectory);
-        }
-
+    // TODO: make this return some Result<impl Iterator<Item=DirEntry>, Error>
+    pub fn list_dir(&self, dir: &Directory) -> Result<Vec<DirEntry>, Error> {
         let mut entries = Vec::new();
         let block_size = self.superblock.block_size() as usize;
         let dir_entries_have_type = self
@@ -26,12 +23,9 @@ where
             .required_features()
             .contains(RequiredFeatures::DIRECTORY_ENTRIES_HAVE_TYPE);
 
-        for block in (0_usize..12)
-            .map(|i| inode.direct_ptr(i))
-            .filter(|&p| p != 0)
-        {
+        for addr in (0_usize..12).filter_map(|i| dir.direct_ptr(i)) {
             let mut data = vec![0_u8; block_size];
-            self.read_block(block, &mut data)
+            self.read_block(addr, &mut data)
                 .map_err(|_| Error::DeviceRead)?;
 
             let mut offset = 0;
@@ -39,7 +33,7 @@ where
                 let dir_entry = DirEntry::from(dir_entries_have_type, &data[offset..]);
                 offset += dir_entry.total_size as usize;
                 // we don't need to align the offset, as there must be no space between entries
-                if dir_entry.inode == 0 {
+                if dir_entry.inode().is_none() {
                     // entry invalid, move on
                     continue;
                 }
@@ -47,7 +41,26 @@ where
             }
         }
 
+        // TODO: handle indirect ptrs
+
         Ok(entries)
+    }
+
+    pub fn lookup_dir_entry<P>(&self, dir: &Directory, p: P) -> Result<Option<Inode>, Error>
+    where
+        P: FnMut(&DirEntry) -> bool,
+    {
+        self.list_dir(dir)?
+            .into_iter()
+            .find(p)
+            .map(|e| self.resolve_dir_entry(e))
+            .transpose()
+    }
+
+    pub fn resolve_dir_entry(&self, entry: DirEntry) -> Result<Inode, Error> {
+        let address =
+            InodeAddress::new(entry.inode).ok_or(Error::InvalidInodeAddress(entry.inode))?;
+        self.read_inode(address)
     }
 }
 
@@ -101,8 +114,8 @@ impl DirEntry {
         self.type_indicator
     }
 
-    pub fn inode(&self) -> u32 {
-        self.inode
+    pub fn inode(&self) -> Option<InodeAddress> {
+        InodeAddress::new(self.inode)
     }
 }
 

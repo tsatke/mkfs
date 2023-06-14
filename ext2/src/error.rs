@@ -6,7 +6,9 @@ pub enum Error {
     UnableToReadSuperblock,
     UnableToReadBlockGroupDescriptorTable,
     NotDirectory,
+    NotRegularFile,
     DeviceRead,
+    InvalidInodeAddress(u32),
 }
 
 impl Display for Error {
