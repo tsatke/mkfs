@@ -56,7 +56,8 @@ pub trait BlockDevice {
             (offset + buf.len()) / sector_size
         };
         let sector_count = end_sector - start_sector
-            + if relative_offset == 0 && start_sector != end_sector {
+            + if relative_offset == 0 && buf.len() % sector_size == 0 && start_sector != end_sector
+            {
                 0
             } else {
                 1

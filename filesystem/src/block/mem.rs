@@ -100,4 +100,15 @@ mod tests {
         let expected = [0_u8; 0];
         assert_eq!(expected, buf);
     }
+
+    #[test]
+    fn test_read_unaligned() {
+        let data = vec![1_u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        let device = MemoryBlockDevice::try_new(4, data).unwrap();
+
+        let mut buf = [0_u8; 10];
+        device.read_at(0, &mut buf).unwrap();
+        let expected = [1_u8, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        assert_eq!(expected, buf);
+    }
 }
