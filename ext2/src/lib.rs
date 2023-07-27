@@ -69,6 +69,10 @@ where
         })
     }
 
+    pub fn superblock(&self) -> &Superblock {
+        &self.superblock
+    }
+
     pub fn read_root_inode(&self) -> Result<Directory, Error> {
         self.read_inode(ROOT_DIR_INODE_ADDRESS)
             .and_then(|inode| Directory::try_from(inode).map_err(|_| Error::NotDirectory))
