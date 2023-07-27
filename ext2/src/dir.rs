@@ -46,7 +46,11 @@ where
         Ok(entries)
     }
 
-    pub fn lookup_dir_entry<P>(&self, dir: &Directory, p: P) -> Result<Option<Inode>, Error>
+    pub fn lookup_dir_entry<P>(
+        &self,
+        dir: &Directory,
+        p: P,
+    ) -> Result<Option<(InodeAddress, Inode)>, Error>
     where
         P: FnMut(&DirEntry) -> bool,
     {
@@ -57,7 +61,7 @@ where
             .transpose()
     }
 
-    pub fn resolve_dir_entry(&self, entry: DirEntry) -> Result<Inode, Error> {
+    pub fn resolve_dir_entry(&self, entry: DirEntry) -> Result<(InodeAddress, Inode), Error> {
         let address =
             InodeAddress::new(entry.inode).ok_or(Error::InvalidInodeAddress(entry.inode))?;
         self.read_inode(address)

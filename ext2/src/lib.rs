@@ -78,7 +78,7 @@ where
             .and_then(|inode| Directory::try_from(inode).map_err(|_| Error::NotDirectory))
     }
 
-    fn read_inode(&self, addr: InodeAddress) -> Result<Inode, Error> {
+    fn read_inode(&self, addr: InodeAddress) -> Result<(InodeAddress, Inode), Error> {
         let inodes_per_group = self.superblock.inodes_per_group();
         let block_group_index = (addr.get() - 1) / inodes_per_group;
         let block_group = &self.bgdt[block_group_index as usize];
@@ -95,10 +95,7 @@ where
             .read_at(address, &mut inode_buffer)
             .map_err(|_| Error::DeviceRead)?;
 
-        Ok(
-            Inode::try_from(InodeRawArray::from(inode_buffer))
-                .expect("inode conversion can't fail. if it does, the logic has changed and this should propagate the error")
-        )
+        Ok((addr, Inode::try_from(InodeRawArray::from(inode_buffer)).expect("inode conversion can't fail. if it does, the logic has changed and this should propagate the error")))
     }
 
     pub fn read_block(&self, addr: BlockAddress, buf: &mut [u8]) -> Result<usize, Error> {

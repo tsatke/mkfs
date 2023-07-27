@@ -1,5 +1,6 @@
 use crate::{
     bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented, BlockAddress,
+    InodeAddress,
 };
 use bitflags::bitflags;
 use core::ops::{Deref, DerefMut};
@@ -7,22 +8,32 @@ use core::ops::{Deref, DerefMut};
 macro_rules! inode_type {
     ($name:ident, $typ:expr) => {
         #[derive(Debug)]
-        pub struct $name(Inode);
+        pub struct $name(InodeAddress, Inode);
+
+        impl $name {
+            pub fn inode_address(&self) -> InodeAddress {
+                self.0
+            }
+
+            pub fn inode(&self) -> &Inode {
+                &self.1
+            }
+        }
 
         impl Deref for $name {
             type Target = Inode;
 
             fn deref(&self) -> &Self::Target {
-                &self.0
+                &self.1
             }
         }
 
-        impl TryFrom<Inode> for $name {
-            type Error = Inode;
+        impl TryFrom<(InodeAddress, Inode)> for $name {
+            type Error = (InodeAddress, Inode);
 
-            fn try_from(v: Inode) -> Result<Self, Self::Error> {
-                if v.typ() == $typ {
-                    Ok(Self(v))
+            fn try_from(v: (InodeAddress, Inode)) -> Result<Self, Self::Error> {
+                if v.1.typ() == $typ {
+                    Ok(Self(v.0, v.1))
                 } else {
                     Err(v)
                 }
@@ -31,7 +42,7 @@ macro_rules! inode_type {
 
         impl From<$name> for Inode {
             fn from(v: $name) -> Self {
-                v.0
+                v.1
             }
         }
     };
