@@ -101,7 +101,7 @@ where
         )
     }
 
-    pub(crate) fn read_block(&self, addr: BlockAddress, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read_block(&self, addr: BlockAddress, buf: &mut [u8]) -> Result<usize, Error> {
         let offset = self.resolve_block_offset(addr);
         self.block_device
             .read_at(offset, buf)

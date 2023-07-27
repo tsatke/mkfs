@@ -142,6 +142,10 @@ impl Inode {
         })
     }
 
+    pub fn single_indirect_ptr(&self) -> Option<BlockAddress> {
+        BlockAddress::new(self.singly_indirect_block_ptr)
+    }
+
     pub fn len(&self) -> usize {
         if self.typ() == Type::Directory {
             self.byte_size_lower as usize
