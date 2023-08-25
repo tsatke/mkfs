@@ -135,10 +135,6 @@ impl Inode {
         Flags::from_bits_truncate(self.flags)
     }
 
-    pub fn direct_ptrs(&self) -> impl Iterator<Item = BlockAddress> + '_ {
-        (0..12).filter_map(|i| self.direct_ptr(i))
-    }
-
     pub fn direct_ptr(&self, index: usize) -> Option<BlockAddress> {
         BlockAddress::new(match index {
             0 => self.direct_block_ptr_0,
@@ -159,6 +155,14 @@ impl Inode {
 
     pub fn single_indirect_ptr(&self) -> Option<BlockAddress> {
         BlockAddress::new(self.singly_indirect_block_ptr)
+    }
+
+    pub fn double_indirect_ptr(&self) -> Option<BlockAddress> {
+        BlockAddress::new(self.doubly_indirect_block_ptr)
+    }
+
+    pub fn triple_indirect_ptr(&self) -> Option<BlockAddress> {
+        BlockAddress::new(self.triply_indirect_block_ptr)
     }
 
     pub fn len(&self) -> usize {
