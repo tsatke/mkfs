@@ -53,4 +53,8 @@ impl BlockAddress {
             Some(v) => Some(Self(v)),
         }
     }
+
+    pub fn into_u32(self) -> u32 {
+        self.0.get()
+    }
 }
