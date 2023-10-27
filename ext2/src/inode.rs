@@ -18,6 +18,10 @@ macro_rules! inode_type {
             pub fn inode(&self) -> &Inode {
                 &self.1
             }
+
+            pub fn into_inner(self) -> (InodeAddress, Inode) {
+                (self.0, self.1)
+            }
         }
 
         impl Deref for $name {
