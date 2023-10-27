@@ -16,7 +16,9 @@ where
 {
     // TODO: make this return some Result<impl Iterator<Item=DirEntry>, Error>
     pub fn list_dir(&self, dir: &Inode) -> Result<Vec<DirEntry>, Error> {
-        debug_assert_eq!(dir.typ(), Type::Directory);
+        if dir.typ() != Type::Directory {
+            return Err(Error::NotDirectory);
+        }
 
         let mut entries = Vec::new();
         let block_size = self.superblock.block_size() as usize;
