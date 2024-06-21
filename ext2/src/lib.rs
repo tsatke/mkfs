@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(const_option)]
-#![feature(error_in_core)]
 
 extern crate alloc;
 
