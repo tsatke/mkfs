@@ -98,6 +98,12 @@ macro_rules! bytefield {
 
         impl From<$name> for $source {
             fn from(value: $name) -> Self {
+                Self::from(&value)
+            }
+        }
+
+        impl From<&$name> for $source {
+            fn from(value: &$name) -> Self {
                 let mut r: Self = Default::default();
                 $(
                 bytefield_field_write!($typ, value.$field, $offset, r);

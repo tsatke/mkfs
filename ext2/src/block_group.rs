@@ -1,6 +1,7 @@
-use crate::{bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented};
 use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
+
+use crate::{bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented};
 
 bytefield! {
     pub struct BlockGroupDescriptor ([u8; 32]) {
@@ -28,6 +29,10 @@ impl BlockGroupDescriptor {
 
     pub fn num_unallocated_blocks(&self) -> u16 {
         self.num_unallocated_blocks
+    }
+
+    pub fn num_unallocated_blocks_mut(&mut self) -> &mut u16 {
+        &mut self.num_unallocated_blocks
     }
 
     pub fn num_unallocated_inodes(&self) -> u16 {

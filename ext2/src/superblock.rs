@@ -1,9 +1,16 @@
 use core::ops::{Deref, DerefMut, Shl};
 
-use crate::{bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented};
 use bitflags::bitflags;
 
+use crate::{bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented};
+
 pub struct SuperblockArray([u8; 1024]);
+
+impl SuperblockArray {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl From<[u8; 1024]> for SuperblockArray {
     fn from(value: [u8; 1024]) -> Self {
@@ -92,6 +99,10 @@ impl Superblock {
 
     pub fn num_unallocated_blocks(&self) -> u32 {
         self.num_unallocated_blocks
+    }
+
+    pub fn num_unallocated_blocks_mut(&mut self) -> &mut u32 {
+        &mut self.num_unallocated_blocks
     }
 
     pub fn num_unallocated_inodes(&self) -> u32 {

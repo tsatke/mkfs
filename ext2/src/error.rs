@@ -4,7 +4,9 @@ use core::fmt::{Debug, Display, Formatter};
 pub enum Error {
     InvalidSuperblock,
     UnableToReadSuperblock,
+    UnableToWriteSuperblock,
     UnableToReadBlockGroupDescriptorTable,
+    UnableToWriteBlockGroupDescriptorTable,
     NotDirectory,
     NotRegularFile,
     DeviceRead,

@@ -1,9 +1,11 @@
+use core::ops::{Deref, DerefMut};
+
+use bitflags::bitflags;
+
 use crate::{
-    bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented, BlockAddress,
+    BlockAddress, bytefield, bytefield_field_read, bytefield_field_write, check_is_implemented,
     InodeAddress,
 };
-use bitflags::bitflags;
-use core::ops::{Deref, DerefMut};
 
 macro_rules! inode_type {
     ($name:ident, $typ:expr) => {
@@ -61,6 +63,12 @@ inode_type!(SymLink, Type::SymLink);
 inode_type!(UnixSocket, Type::UnixSocket);
 
 pub struct InodeRawArray([u8; 128]);
+
+impl InodeRawArray {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl From<[u8; 128]> for InodeRawArray {
     fn from(value: [u8; 128]) -> Self {
