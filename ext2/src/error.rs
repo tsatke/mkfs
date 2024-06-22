@@ -8,6 +8,7 @@ pub enum Error {
     NotDirectory,
     NotRegularFile,
     DeviceRead,
+    DeviceWrite,
     InvalidInodeAddress(u32),
 }
 

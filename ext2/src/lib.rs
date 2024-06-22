@@ -5,6 +5,14 @@ extern crate alloc;
 
 use alloc::vec;
 
+pub use address::*;
+pub use dir::*;
+pub use error::*;
+pub use file::*;
+use filesystem::BlockDevice;
+pub use inode::*;
+pub use superblock::*;
+
 use crate::block_group::{BlockGroupDescriptor, BlockGroupDescriptorTable};
 
 mod address;
@@ -15,15 +23,6 @@ mod error;
 mod file;
 mod inode;
 mod superblock;
-
-use filesystem::BlockDevice;
-
-pub use address::*;
-pub use dir::*;
-pub use error::*;
-pub use file::*;
-pub use inode::*;
-pub use superblock::*;
 
 const ROOT_DIR_INODE_ADDRESS: InodeAddress = InodeAddress::new(2).unwrap();
 
@@ -102,6 +101,13 @@ where
         self.block_device
             .read_at(offset, buf)
             .map_err(|_| Error::DeviceRead)
+    }
+
+    pub fn write_block(&mut self, addr: BlockAddress, buf: &[u8]) -> Result<usize, Error> {
+        let offset = self.resolve_block_offset(addr);
+        self.block_device
+            .write_at(offset, buf)
+            .map_err(|_| Error::DeviceWrite)
     }
 
     fn resolve_block_offset(&self, addr: BlockAddress) -> usize {
