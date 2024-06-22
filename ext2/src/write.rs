@@ -34,35 +34,35 @@ where
             data
         };
 
-        for (i, block) in (start_block..=end_block).enumerate() {
-            if !self.is_block_allocated(file, block)? {
-                // TODO: we don't need to allocate if the full content of this block would be zero if the fs allows sparse files
-                let free_block_address = self.allocate_block()?;
-                if free_block_address.is_none() {
-                    return Err(Error::NoSpace);
-                }
-                let free_block_address = free_block_address.unwrap();
-
-                let inode = file.inode_mut();
-                let free_slot = inode.direct_ptrs()
-                    .enumerate()
-                    .find(|(_, ptr)| ptr.is_none())
-                    .map(|(i, _)| i);
-                if let Some(free_slot) = free_slot {
-                    inode.set_direct_ptr(free_slot, Some(free_block_address));
-                    self.write_inode(file.inode_address(), file)?;
-                } else {
-                    todo!("allocate indirect block");
-                }
-            }
-        }
-
-        // we can now be certain that all blocks that we want to write into are allocated
-
         let mut chunks = data.chunks_exact(block_size as usize);
-        for (block, data) in (start_block..=end_block).zip(&mut chunks) {
-            let block_address = self.resolve_block_index(&file, block)?.expect("we should have just allocated this block, it should be present");
-            self.write_block(block_address, data)?;
+        for ((i, block), chunk) in (start_block..=end_block).enumerate().zip(&mut chunks) {
+            let block_address =
+                if let Some(block_address) = self.resolve_block_index(file, block)? {
+                    block_address
+                } else {
+                    // TODO: we don't need to allocate if the full content of this block would be zero if the fs allows sparse files
+                    let free_block_address = self.allocate_block()?;
+                    if free_block_address.is_none() {
+                        return Err(Error::NoSpace);
+                    }
+                    let free_block_address = free_block_address.unwrap();
+
+                    let inode = file.inode_mut();
+                    let free_slot = inode.direct_ptrs()
+                        .enumerate()
+                        .find(|(_, ptr)| ptr.is_none())
+                        .map(|(i, _)| i);
+                    if let Some(free_slot) = free_slot {
+                        inode.set_direct_ptr(free_slot, Some(free_block_address));
+                        self.write_inode(file.inode_address(), file)?;
+                    } else {
+                        todo!("allocate indirect block");
+                    }
+
+                    free_block_address
+                };
+
+            self.write_block(block_address, chunk)?;
         }
         debug_assert_eq!(chunks.remainder().len(), 0, "data to write was not block aligned");
 
