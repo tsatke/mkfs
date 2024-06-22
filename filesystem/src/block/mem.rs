@@ -16,6 +16,10 @@ where
         }
         Some(Self { sector_size, data })
     }
+
+    pub fn data(&self) -> &T {
+        &self.data
+    }
 }
 
 impl<T> BlockDevice for MemoryBlockDevice<T>
@@ -53,9 +57,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use crate::block::mem::MemoryBlockDevice;
     use crate::BlockDevice;
-    use alloc::vec;
 
     #[test]
     fn test_read_at_short() {
@@ -110,5 +115,54 @@ mod tests {
         device.read_at(0, &mut buf).unwrap();
         let expected = [1_u8, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         assert_eq!(expected, buf);
+    }
+
+    #[test]
+    fn test_write_at() {
+        let data = vec![0xFF_u8; 16];
+        let mut device = MemoryBlockDevice::try_new(4, data).unwrap();
+
+        device.write_at(0, &[1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
+        assert_eq!(&[1, 2, 3, 4, 5, 6, 7, 8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], device.data().as_slice());
+    }
+
+    #[test]
+    fn test_write_at_unaligned() {
+        let data = vec![0xFF_u8; 16];
+        let mut device = MemoryBlockDevice::try_new(4, data).unwrap();
+
+        device.write_at(1, &[1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
+        assert_eq!(&[0xFF, 1, 2, 3, 4, 5, 6, 7, 8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], device.data().as_slice());
+    }
+
+    #[test]
+    fn test_write_at_aligned_short() {
+        let data = vec![0xFF_u8; 16];
+        let mut device = MemoryBlockDevice::try_new(4, data).unwrap();
+
+        device.write_at(0, &[1, 2]).unwrap();
+        assert_eq!(&[1, 2, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], device.data().as_slice());
+        device.write_at(0, &[1, 2, 3]).unwrap();
+        assert_eq!(&[1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], device.data().as_slice());
+    }
+
+    #[test]
+    fn test_write_at_unaligned_short() {
+        let data = vec![0xFF_u8; 16];
+        let mut device = MemoryBlockDevice::try_new(4, data).unwrap();
+
+        device.write_at(1, &[1, 2]).unwrap();
+        assert_eq!(&[0xFF, 1, 2, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], device.data().as_slice());
+        device.write_at(1, &[1, 2, 3]).unwrap();
+        assert_eq!(&[0xFF, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], device.data().as_slice());
+    }
+
+    #[test]
+    fn test_write_at_aligned_one_sector() {
+        let data = vec![0xFF_u8; 16];
+        let mut device = MemoryBlockDevice::try_new(4, data).unwrap();
+
+        device.write_at(0, &[1, 2, 3, 4]).unwrap();
+        assert_eq!(&[1, 2, 3, 4, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], device.data().as_slice());
     }
 }
