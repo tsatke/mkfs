@@ -33,6 +33,18 @@ macro_rules! bytefield_field_read {
             t
         }
     };
+    ([u32; $len:literal], $offset:literal, $source:expr) => { $crate::bytefield_field_read!(u32_array [u32; $len], $offset, $source) };
+    (u32_array $typ:ty, $offset:literal, $source:expr) => {
+        {
+            check_is_implemented!($typ, Default);
+            let mut t: $typ = Default::default();
+            let source_bytes = &$source[$offset..$offset + core::mem::size_of::<$typ>()];
+            source_bytes.chunks_exact(4).enumerate().for_each(|(i, chunk)| {
+                t[i] = u32::from_le_bytes(chunk.try_into().unwrap());
+            });
+            t
+        }
+    };
 }
 
 #[macro_export]
@@ -50,6 +62,12 @@ macro_rules! bytefield_field_write {
     ([u8; $len:literal], $field:expr, $offset:literal, $target:expr) => { $crate::bytefield_field_write!(u8_array [u8; $len], $field, $offset, $target) };
     (u8_array $typ:ty, $field:expr, $offset:literal, $target:expr) => {
         $target[$offset..$offset + core::mem::size_of::<$typ>()].copy_from_slice(&$field);
+    };
+    ([u32; $len:literal], $field:expr, $offset:literal, $target:expr) => { $crate::bytefield_field_write!(u32_array [u32; $len], $field, $offset, $target) };
+    (u32_array $typ:ty, $field:expr, $offset:literal, $target:expr) => {
+        let field = $field;
+        let aligned = unsafe { field.align_to::<u8>().1 };
+        $target[$offset..$offset + core::mem::size_of::<$typ>()].copy_from_slice(&aligned);
     };
 }
 

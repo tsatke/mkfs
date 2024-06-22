@@ -115,18 +115,7 @@ bytefield! {
         num_disk_sectors: u32 = 28,
         flags: u32 = 32,
         os_val_1: [u8; 4] = 36,
-        direct_block_ptr_0: u32 = 40,
-        direct_block_ptr_1: u32 = 44,
-        direct_block_ptr_2: u32 = 48,
-        direct_block_ptr_3: u32 = 52,
-        direct_block_ptr_4: u32 = 56,
-        direct_block_ptr_5: u32 = 60,
-        direct_block_ptr_6: u32 = 64,
-        direct_block_ptr_7: u32 = 68,
-        direct_block_ptr_8: u32 = 72,
-        direct_block_ptr_9: u32 = 76,
-        direct_block_ptr_10: u32 = 80,
-        direct_block_ptr_11: u32 = 84,
+        direct_block_ptr: [u32; 12] = 40,
         singly_indirect_block_ptr: u32 = 88,
         doubly_indirect_block_ptr: u32 = 92,
         triply_indirect_block_ptr: u32 = 96,
@@ -160,21 +149,15 @@ impl Inode {
     }
 
     pub fn direct_ptr(&self, index: usize) -> Option<BlockAddress> {
-        BlockAddress::new(match index {
-            0 => self.direct_block_ptr_0,
-            1 => self.direct_block_ptr_1,
-            2 => self.direct_block_ptr_2,
-            3 => self.direct_block_ptr_3,
-            4 => self.direct_block_ptr_4,
-            5 => self.direct_block_ptr_5,
-            6 => self.direct_block_ptr_6,
-            7 => self.direct_block_ptr_7,
-            8 => self.direct_block_ptr_8,
-            9 => self.direct_block_ptr_9,
-            10 => self.direct_block_ptr_10,
-            11 => self.direct_block_ptr_11,
-            _ => panic!("direct pointer {} does not exist", index),
-        })
+        BlockAddress::new(self.direct_block_ptr[index])
+    }
+
+    pub fn direct_ptrs(&self) -> impl Iterator<Item=Option<BlockAddress>> + '_ {
+        self.direct_block_ptr.iter().map(|&ptr| BlockAddress::new(ptr))
+    }
+
+    pub fn set_direct_ptr(&mut self, index: usize, ptr: Option<BlockAddress>) {
+        self.direct_block_ptr[index] = ptr.map_or(0, |v| v.into_u32());
     }
 
     pub fn single_indirect_ptr(&self) -> Option<BlockAddress> {

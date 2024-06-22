@@ -36,14 +36,24 @@ where
 
         for (i, block) in (start_block..=end_block).enumerate() {
             if !self.is_block_allocated(file, block)? {
-                todo!("allocate block")
-                // // TODO: we don't need to allocate if the full content of this block would be zero if the fs allows sparse files
-                // let free_block_address = self.allocate_block()?;
-                // if free_block_address.is_none() {
-                //     return Err(Error::NoSpace);
-                // }
-                // let free_block_address = free_block_address.unwrap();
-                // // TODO: write the block address to the inode
+                // TODO: we don't need to allocate if the full content of this block would be zero if the fs allows sparse files
+                let free_block_address = self.allocate_block()?;
+                if free_block_address.is_none() {
+                    return Err(Error::NoSpace);
+                }
+                let free_block_address = free_block_address.unwrap();
+
+                let inode = file.inode_mut();
+                let free_slot = inode.direct_ptrs()
+                    .enumerate()
+                    .find(|(_, ptr)| ptr.is_none())
+                    .map(|(i, _)| i);
+                if let Some(free_slot) = free_slot {
+                    inode.set_direct_ptr(free_slot, Some(free_block_address));
+                    self.write_inode(file.inode_address(), file)?;
+                } else {
+                    todo!("allocate indirect block");
+                }
             }
         }
 
