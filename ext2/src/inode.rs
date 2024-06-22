@@ -21,6 +21,10 @@ macro_rules! inode_type {
                 &self.1
             }
 
+            pub fn inode_mut(&mut self) -> &mut Inode {
+                &mut self.1
+            }
+
             pub fn into_inner(self) -> (InodeAddress, Inode) {
                 (self.0, self.1)
             }
@@ -145,6 +149,14 @@ impl Inode {
 
     pub fn flags(&self) -> Flags {
         Flags::from_bits_truncate(self.flags)
+    }
+
+    pub fn set_file_size_lower(&mut self, size: u32) {
+        self.byte_size_lower = size;
+    }
+
+    pub fn set_file_size_upper(&mut self, size: u32) {
+        self.byte_size_upper_or_dir_acl = size;
     }
 
     pub fn direct_ptr(&self, index: usize) -> Option<BlockAddress> {

@@ -41,7 +41,7 @@ where
         Ok(total_read)
     }
 
-    fn read_blocks_from_inode(&self, inode: &Inode, start_block: usize, end_block: usize, buf: &mut [u8]) -> Result<usize, Error> {
+    pub(crate) fn read_blocks_from_inode(&self, inode: &Inode, start_block: usize, end_block: usize, buf: &mut [u8]) -> Result<usize, Error> {
         let block_size = self.superblock.block_size() as usize;
         assert_eq!(buf.len(), (end_block - start_block + 1) * block_size, "buf.len() must be equal to the number of blocks you want to read");
 
@@ -79,6 +79,11 @@ where
     }
 
     pub fn is_block_allocated(&self, inode: &Inode, block_index: u32) -> Result<bool, Error> {
+        self.resolve_block_index(inode, block_index)
+            .map(|block| block.is_some())
+    }
+
+    pub fn resolve_block_index(&self, inode: &Inode, block_index: u32) -> Result<Option<BlockAddress>, Error> {
         let (direct_limit, indirect_limit, double_indirect_limit) = self.indirect_pointer_limits();
 
         Ok(
@@ -91,7 +96,6 @@ where
             } else {
                 self.resolve_triple_indirect_ptr(inode.triple_indirect_ptr(), block_index - double_indirect_limit)?
             }
-                .is_some()
         )
     }
 
