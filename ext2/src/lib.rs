@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(const_option)]
+#![feature(iter_array_chunks)]
 
 extern crate alloc;
 
@@ -8,7 +9,6 @@ use alloc::vec;
 pub use address::*;
 pub use dir::*;
 pub use error::*;
-pub use file::*;
 use filesystem::BlockDevice;
 pub use inode::*;
 pub use superblock::*;
@@ -20,9 +20,10 @@ mod block_group;
 mod bytefield;
 mod dir;
 mod error;
-mod file;
+mod read;
 mod inode;
 mod superblock;
+mod write;
 
 const ROOT_DIR_INODE_ADDRESS: InodeAddress = InodeAddress::new(2).unwrap();
 
