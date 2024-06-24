@@ -109,6 +109,10 @@ impl Superblock {
         self.num_unallocated_inodes
     }
 
+    pub fn num_unallocated_inodes_mut(&mut self) -> &mut u32 {
+        &mut self.num_unallocated_inodes
+    }
+
     pub fn superblock_block_number(&self) -> u32 {
         self.superblock_block_number
     }

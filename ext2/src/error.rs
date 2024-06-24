@@ -13,6 +13,7 @@ pub enum Error {
     DeviceWrite,
     InvalidInodeAddress(u32),
     NoSpace,
+    NotSupported,
 }
 
 impl Display for Error {

@@ -8,7 +8,6 @@ impl<T> Ext2Fs<T>
 where
     T: BlockDevice,
 {
-    #[allow(unused_variables)]
     pub fn write_to_file(
         &mut self,
         file: &mut RegularFile,
@@ -34,8 +33,9 @@ where
             data
         };
 
+        let mut num_new_allocated_blocks = 0;
         let mut chunks = data.chunks_exact(block_size as usize);
-        for ((i, block), chunk) in (start_block..=end_block).enumerate().zip(&mut chunks) {
+        for ((_, block), chunk) in (start_block..=end_block).enumerate().zip(&mut chunks) {
             let block_address =
                 if let Some(block_address) = self.resolve_block_index(file, block)? {
                     block_address
@@ -46,6 +46,7 @@ where
                         return Err(Error::NoSpace);
                     }
                     let free_block_address = free_block_address.unwrap();
+                    num_new_allocated_blocks += 1;
 
                     let inode = file.inode_mut();
                     let free_slot = inode.direct_ptrs()
@@ -74,6 +75,8 @@ where
             let inode = file.inode_mut();
             inode.set_file_size_lower(new_size_lower);
             inode.set_file_size_upper(new_size_upper);
+
+            *inode.num_disk_sectors_mut() += num_new_allocated_blocks;
 
             self.write_inode(file.inode_address(), file)?;
         }

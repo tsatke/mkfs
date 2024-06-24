@@ -18,10 +18,11 @@ use crate::block_group::{BlockGroupDescriptor, BlockGroupDescriptorTable};
 mod address;
 mod block_group;
 mod bytefield;
+mod create;
 mod dir;
 mod error;
-mod read;
 mod inode;
+mod read;
 mod superblock;
 mod write;
 
@@ -81,6 +82,7 @@ where
     }
 
     pub fn read_inode(&self, addr: InodeAddress) -> Result<(InodeAddress, Inode), Error> {
+        // FIXME: reading the inode will create multiple copies that alias the data in the block device, there needs to be some kind of cache that centralizes the inodes (and their data)
         let inodes_per_group = self.superblock.inodes_per_group();
         let block_group_index = (addr.get() - 1) / inodes_per_group;
         let block_group = &self.bgdt[block_group_index as usize];
@@ -138,16 +140,30 @@ where
     }
 
     pub fn allocate_block(&mut self) -> Result<Option<BlockAddress>, Error> {
-        let block_size = self.superblock.block_size();
         let blocks_per_group = self.superblock.blocks_per_group();
+        self.allocate_resource(blocks_per_group, Self::try_reserve_block_in_group)
+            .map(|block| block.map(BlockAddress::new).flatten())
+    }
+
+    pub fn allocate_inode(&mut self) -> Result<Option<InodeAddress>, Error> {
+        let inodes_per_group = self.superblock.inodes_per_group();
+        self.allocate_resource(inodes_per_group, Self::try_reserve_inode_in_group)
+            .map(|inode| inode.map(InodeAddress::new).flatten())
+    }
+
+    fn allocate_resource<F>(&mut self, resource_per_group: u32, try_reserve_in_group: F) -> Result<Option<u32>, Error>
+    where
+        F: Fn(&mut Self, usize) -> Result<Option<usize>, Error>,
+    {
+        let block_size = self.superblock.block_size();
         let num_groups = self.bgdt.len();
 
         for group_index in 0..num_groups {
-            let first_free_block_index = self.try_reserve_block_in_group(group_index)?;
-            if first_free_block_index.is_none() {
+            let first_free_resource_index = try_reserve_in_group(self, group_index)?;
+            if first_free_resource_index.is_none() {
                 continue;
             }
-            let first_free_block_index = first_free_block_index.unwrap();
+            let first_free_resource_index = first_free_resource_index.unwrap();
 
             let descriptor = &mut self.bgdt[group_index];
             *descriptor.num_unallocated_blocks_mut() -= 1;
@@ -167,30 +183,36 @@ where
                 .write_at(BLOCK_GROUP_DESCRIPTOR_TABLE_OFFSET, &bgdt_data)
                 .map_err(|_| Error::UnableToWriteBlockGroupDescriptorTable)?;
 
-
             *self.superblock.num_unallocated_blocks_mut() -= 1;
             let superblock_data = Into::<SuperblockArray>::into(&self.superblock);
             self.block_device
                 .write_at(SUPERBLOCK_OFFSET, superblock_data.as_slice())
                 .map_err(|_| Error::UnableToWriteSuperblock)?;
 
-            let global_block_num = group_index as u32 * blocks_per_group + first_free_block_index as u32;
-            return Ok(Some(BlockAddress::new(global_block_num).unwrap()));
+            let global_resource_num = group_index as u32 * resource_per_group + first_free_resource_index as u32;
+            return Ok(Some(global_resource_num));
         }
 
         Ok(None)
     }
 
-    /// Tries to allocate a block in the given block group and returns the index in the group
-    /// if successful. This reads the block usage bitmap from the block group, maybe modifies
-    /// it and writes it back.
     fn try_reserve_block_in_group(&mut self, group_index: usize) -> Result<Option<usize>, Error> {
-        let mut block_bitmap = vec![0_u8; self.superblock.block_size() as usize];
         let bitmap_block = self.bgdt[group_index].block_usage_bitmap_block();
         let bitmap_block_address = BlockAddress::new(bitmap_block).expect("bgdt does not have valid block address for bitmap block");
-        self.read_block(bitmap_block_address, &mut block_bitmap)?;
+        self.try_reserve_in_group_with_bitmap(bitmap_block_address)
+    }
 
-        for (i, byte) in block_bitmap.iter_mut().enumerate() {
+    fn try_reserve_inode_in_group(&mut self, group_index: usize) -> Result<Option<usize>, Error> {
+        let bitmap_block = self.bgdt[group_index].inode_usage_bitmap_block();
+        let bitmap_block_address = BlockAddress::new(bitmap_block).expect("bgdt does not have valid block address for bitmap block");
+        self.try_reserve_in_group_with_bitmap(bitmap_block_address)
+    }
+
+    fn try_reserve_in_group_with_bitmap(&mut self, bitmap_block: BlockAddress) -> Result<Option<usize>, Error> {
+        let mut inode_bitmap = vec![0_u8; self.superblock.block_size() as usize];
+        self.read_block(bitmap_block, &mut inode_bitmap)?;
+
+        for (i, byte) in inode_bitmap.iter_mut().enumerate() {
             for bit_index in 0..8 {
                 if *byte & (1_u8 << bit_index) == 0 {
                     *byte |= 1 << bit_index;
@@ -198,7 +220,7 @@ where
                 }
             }
         }
-        self.write_block(bitmap_block_address, &block_bitmap)?;
+        self.write_block(bitmap_block, &inode_bitmap)?;
         Ok(None)
     }
 }

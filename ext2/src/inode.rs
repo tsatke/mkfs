@@ -128,6 +128,34 @@ bytefield! {
 }
 
 impl Inode {
+    /// Creates a new inode with the given type.
+    /// All other fields are uninitialized (zeroed).
+    pub fn new(typ: Type) -> Self {
+        Self {
+            type_and_perm: typ.bits(),
+            user_id: 0,
+            byte_size_lower: 0,
+            last_access_time: 0,
+            creation_time: 0,
+            last_modification_time: 0,
+            deletion_time: 0,
+            group_id: 0,
+            num_hard_links: 0,
+            num_disk_sectors: 0,
+            flags: 0,
+            os_val_1: [0; 4],
+            direct_block_ptr: [0; 12],
+            singly_indirect_block_ptr: 0,
+            doubly_indirect_block_ptr: 0,
+            triply_indirect_block_ptr: 0,
+            generation: 0,
+            extended_attribute_block: 0,
+            byte_size_upper_or_dir_acl: 0,
+            fragment_block_address: 0,
+            os_val_2: [0; 12],
+        }
+    }
+
     pub fn typ(&self) -> Type {
         Type::from_bits_truncate(self.type_and_perm)
     }
@@ -148,8 +176,12 @@ impl Inode {
         self.byte_size_upper_or_dir_acl = size;
     }
 
-    pub fn direct_ptr(&self, index: usize) -> Option<BlockAddress> {
-        BlockAddress::new(self.direct_block_ptr[index])
+    pub fn num_disk_sectors(&self) -> u32 {
+        self.num_disk_sectors
+    }
+
+    pub fn num_disk_sectors_mut(&mut self) -> &mut u32 {
+        &mut self.num_disk_sectors
     }
 
     pub fn direct_ptrs(&self) -> impl Iterator<Item=Option<BlockAddress>> + '_ {

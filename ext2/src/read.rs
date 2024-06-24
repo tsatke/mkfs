@@ -52,7 +52,7 @@ where
         for (i, block) in (start_block..=end_block).enumerate() {
             let block_data = &mut buf[i * block_size..(i + 1) * block_size];
             let block_pointer = if block < direct_limit as usize {
-                inode.direct_ptr(block)
+                inode.direct_ptrs().nth(block).flatten()
             } else if block < indirect_limit as usize {
                 self.resolve_indirect_ptr(inode.single_indirect_ptr(), block as u32 - direct_limit)?
             } else if block < double_indirect_limit as usize {
@@ -88,7 +88,7 @@ where
 
         Ok(
             if block_index < direct_limit {
-                inode.direct_ptr(block_index as usize)
+                inode.direct_ptrs().nth(block_index as usize).flatten()
             } else if block_index < indirect_limit {
                 self.resolve_indirect_ptr(inode.single_indirect_ptr(), block_index - direct_limit)?
             } else if block_index < double_indirect_limit {
