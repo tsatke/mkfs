@@ -1,8 +1,9 @@
-use ext2::{DirType, Ext2Fs, RegularFile, Type};
-use filesystem::MemoryBlockDevice;
 use std::env;
 use std::fs::File;
 use std::io::Read;
+
+use ext2::{DirType, Ext2Fs, RegularFile, Type};
+use filesystem::MemoryBlockDevice;
 
 #[test]
 fn test_list_directory() {
@@ -59,7 +60,7 @@ fn do_test_list_directory(sector_size: usize) {
         assert!(entries
             .iter()
             .find(|&entry| {
-                entry.inode().unwrap().get() == inode
+                entry.inode().get() == inode
                     && entry.name().is_some_and(|n| n == name)
                     && entry.typ() == Some(typ)
             })
