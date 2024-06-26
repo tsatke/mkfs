@@ -49,7 +49,20 @@ where
         Ok(entries)
     }
 
-    pub fn lookup_dir_entry<P>(
+    pub fn find_entry<P>(
+        &self,
+        dir: &Directory,
+        p: P,
+    ) -> Result<Option<DirEntry>, Error>
+    where
+        P: FnMut(&DirEntry) -> bool,
+    {
+        Ok(self.list_dir(dir)?
+            .into_iter()
+            .find(p))
+    }
+
+    pub fn find_and_resolve_entry<P>(
         &self,
         dir: &Directory,
         p: P,
@@ -57,9 +70,7 @@ where
     where
         P: FnMut(&DirEntry) -> bool,
     {
-        self.list_dir(dir)?
-            .into_iter()
-            .find(p)
+        self.find_entry(dir, p)?
             .map(|e| self.resolve_dir_entry(e))
             .transpose()
     }
@@ -75,6 +86,11 @@ where
         inode_address: InodeAddress,
         typ: DirType,
     ) -> Result<(), Error> {
+        // TODO: make this more efficient once we have indexed lookups implemented
+        if self.find_entry(dir, |e| e.name() == Some(name))?.is_some() {
+            return Err(Error::EntryExists);
+        }
+
         let block_size = self.superblock.block_size() as usize;
         let dir_entries_have_type = self
             .superblock

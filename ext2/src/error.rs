@@ -14,6 +14,7 @@ pub enum Error {
     InvalidInodeAddress(u32),
     NoSpace,
     NotSupported,
+    EntryExists,
 }
 
 impl Display for Error {

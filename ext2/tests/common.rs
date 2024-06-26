@@ -6,6 +6,17 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 
 #[macro_export]
+macro_rules! cow_fs {
+    ($path:literal, $device_sector_size:expr) => {
+        {
+            let image_data = common::load_copy_of_image($path);
+            let device = MemoryBlockDevice::try_new($device_sector_size, image_data).unwrap();
+            Ext2Fs::try_new(device).unwrap()
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! generate_tests {
     ($test_fn:ident : $($size:literal - $name:ident),*,) => {
         const _: &dyn Fn(usize) = &$test_fn;

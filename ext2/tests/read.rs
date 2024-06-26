@@ -109,7 +109,7 @@ fn do_test_read_file(sector_size: usize) {
     let root = fs.read_root_inode().unwrap().try_into().unwrap();
 
     let hello_txt: RegularFile = fs
-        .lookup_dir_entry(&root, |e| e.name().is_some_and(|n| n == "hello.txt"))
+        .find_and_resolve_entry(&root, |e| e.name().is_some_and(|n| n == "hello.txt"))
         .expect("lookup_dir_entry failed")
         .expect("hello.txt not found")
         .try_into()

@@ -28,6 +28,7 @@ mod write;
 
 const ROOT_DIR_INODE_ADDRESS: InodeAddress = InodeAddress::new(2).unwrap();
 
+/// An ext2 filesystem over a block device.
 pub struct Ext2Fs<T> {
     block_device: T,
     superblock: Superblock,
