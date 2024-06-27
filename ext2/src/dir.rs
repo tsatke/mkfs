@@ -175,9 +175,10 @@ impl DirEntry {
     }
 
     fn from(dir_entries_have_type: bool, value: &[u8]) -> Self {
+        let required_size = Self::size(0);
         debug_assert!(
-            value.len() >= 8,
-            "need at least 8 byte, but got {}",
+            value.len() >= required_size as usize,
+            "need at least {required_size} byte, but got {}",
             value.len()
         );
 
@@ -194,6 +195,10 @@ impl DirEntry {
         } else {
             None
         };
+
+        let required_size = Self::size(name_length); // now that we have the name length, we can compute the actual required size
+        debug_assert!(value.len() >= Self::size(name_length) as usize, "need at least {} byte, but have only {}", required_size, value.len());
+        
         let name_bytes = value[8..8 + name_length as usize].to_vec();
         Self {
             inode: InodeAddress::new(arr.inode).unwrap(),
