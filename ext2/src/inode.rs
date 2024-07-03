@@ -184,6 +184,38 @@ impl Inode {
         &mut self.num_disk_sectors
     }
 
+    pub fn num_hard_links(&self) -> u16 {
+        self.num_hard_links
+    }
+
+    pub fn num_hard_links_mut(&mut self) -> &mut u16 {
+        &mut self.num_hard_links
+    }
+
+    pub fn last_access_time(&self) -> u32 {
+        self.last_access_time
+    }
+
+    pub fn last_access_time_mut(&mut self) -> &mut u32 {
+        &mut self.last_access_time
+    }
+
+    pub fn last_modification_time(&self) -> u32 {
+        self.last_modification_time
+    }
+
+    pub fn last_modification_time_mut(&mut self) -> &mut u32 {
+        &mut self.last_modification_time
+    }
+
+    pub fn creation_time(&self) -> u32 {
+        self.creation_time
+    }
+
+    pub fn creation_time_mut(&mut self) -> &mut u32 {
+        &mut self.creation_time
+    }
+
     pub fn direct_ptrs(&self) -> impl Iterator<Item=Option<BlockAddress>> + '_ {
         self.direct_block_ptr.iter().map(|&ptr| BlockAddress::new(ptr))
     }
