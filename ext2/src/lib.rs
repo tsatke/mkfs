@@ -147,7 +147,7 @@ where
     }
 
     fn resolve_block_offset(&self, addr: BlockAddress) -> usize {
-        (1024 + (addr.get() - 1) * self.superblock.block_size()) as usize
+        (addr.get() * self.superblock.block_size()) as usize
     }
 
     pub fn allocate_block(&mut self) -> Result<Option<BlockAddress>, Error> {
