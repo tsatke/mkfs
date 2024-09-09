@@ -36,7 +36,6 @@ pub struct Ext2Fs<T> {
 }
 
 const SUPERBLOCK_OFFSET: usize = 1024;
-const BLOCK_GROUP_DESCRIPTOR_TABLE_OFFSET: usize = 2048;
 const BGD_SIZE: usize = 32; // 32 bytes per block group descriptor
 
 impl<T> Ext2Fs<T>
@@ -53,9 +52,11 @@ where
         let number_of_block_groups = (superblock.num_blocks() + superblock.blocks_per_group() - 1)
             / superblock.blocks_per_group();
 
+        let bgdt_offset = if superblock.block_size() == 1024 { 2048 } else { superblock.block_size() } as usize;
+
         let mut bgdt_data = vec![0_u8; superblock.block_size() as usize];
         block_device
-            .read_at(BLOCK_GROUP_DESCRIPTOR_TABLE_OFFSET, &mut bgdt_data)
+            .read_at(bgdt_offset, &mut bgdt_data)
             .map_err(|_| Error::UnableToReadBlockGroupDescriptorTable)?;
         let mut bgdt = BlockGroupDescriptorTable::new();
         for i in 0..number_of_block_groups as usize {
@@ -71,6 +72,15 @@ where
             superblock,
             bgdt,
         })
+    }
+
+    fn bgdt_offset(&self) -> usize {
+        let block_size = self.superblock.block_size() as usize;
+        if block_size == 1024 {
+            2048
+        } else {
+            block_size
+        }
     }
 
     pub fn superblock(&self) -> &Superblock {
@@ -158,6 +168,7 @@ where
     {
         let block_size = self.superblock.block_size();
         let num_groups = self.bgdt.len();
+        let bgdt_offset = self.bgdt_offset();
 
         for group_index in 0..num_groups {
             let first_free_resource_index = try_reserve_in_group(self, group_index)?;
@@ -172,7 +183,7 @@ where
             // read the block group descriptor table
             let mut bgdt_data = vec![0_u8; block_size as usize];
             self.block_device
-                .read_at(BLOCK_GROUP_DESCRIPTOR_TABLE_OFFSET, &mut bgdt_data)
+                .read_at(bgdt_offset, &mut bgdt_data)
                 .map_err(|_| Error::UnableToReadBlockGroupDescriptorTable)?;
             // merge the changed descriptor back into the table
             let bgd_offset = group_index * BGD_SIZE;
@@ -181,7 +192,7 @@ where
             bgdt_data[bgd_offset..bgd_end].copy_from_slice(&bgd_data);
             // write the block group descriptor table back
             self.block_device
-                .write_at(BLOCK_GROUP_DESCRIPTOR_TABLE_OFFSET, &bgdt_data)
+                .write_at(bgdt_offset, &bgdt_data)
                 .map_err(|_| Error::UnableToWriteBlockGroupDescriptorTable)?;
 
             *self.superblock.num_unallocated_blocks_mut() -= 1;
